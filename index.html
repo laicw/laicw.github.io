@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <title>我的工具｜laicw</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧰</text></svg>">
+  <style>
+    :root{
+      --bg:#0f172a; --bar:#111c33; --bar-border:#1e2d4d;
+      --txt:#e6edf7; --muted:#8aa0c0;
+      --accent:#3b82f6; --accent-soft:#1d3a6b;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",Roboto,Helvetica,Arial,sans-serif;}
+    body{display:flex;flex-direction:column;height:100dvh;overflow:hidden;}
+
+    header{
+      flex:0 0 auto;background:var(--bar);border-bottom:1px solid var(--bar-border);
+      padding:env(safe-area-inset-top) 0 0 0;
+    }
+    .brand{display:flex;align-items:center;gap:8px;padding:10px 16px 4px;}
+    .brand h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.3px;}
+    .brand .dot{color:var(--muted);font-size:12px;font-weight:400}
+
+    nav{display:flex;gap:6px;overflow-x:auto;padding:6px 12px 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+    nav::-webkit-scrollbar{display:none}
+    .tab{
+      flex:0 0 auto;display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;
+      background:transparent;border:1px solid var(--bar-border);color:var(--muted);
+      padding:8px 14px;border-radius:999px;font-size:14px;white-space:nowrap;transition:.15s;
+    }
+    .tab:hover{color:var(--txt);border-color:#2c4170}
+    .tab.active{background:var(--accent-soft);border-color:var(--accent);color:#fff;}
+    .tab .emoji{font-size:16px;line-height:1}
+
+    main{flex:1 1 auto;position:relative;background:#fff;}
+    .frame{position:absolute;inset:0;width:100%;height:100%;border:0;display:none;background:#fff;}
+    .frame.active{display:block;}
+
+    .loader{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+      background:var(--bg);color:var(--muted);font-size:14px;flex-direction:column;gap:12px;z-index:5;}
+    .loader.show{display:flex;}
+    .spin{width:34px;height:34px;border:3px solid var(--bar-border);border-top-color:var(--accent);
+      border-radius:50%;animation:r .8s linear infinite;}
+    @keyframes r{to{transform:rotate(360deg)}}
+    .loader a{color:var(--accent);font-size:13px;text-decoration:none;}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span style="font-size:18px">🧰</span>
+      <h1>我的工具</h1>
+      <span class="dot">· laicw</span>
+    </div>
+    <nav id="nav"></nav>
+  </header>
+
+  <main id="main">
+    <div class="loader" id="loader">
+      <div class="spin"></div>
+      <div>載入中…</div>
+      <a id="loaderLink" href="#" target="_blank" rel="noopener">在新分頁開啟 ↗</a>
+    </div>
+  </main>
+
+  <script>
+    const TOOLS = [
+      { id:'bank',      emoji:'🏦', label:'銀行追蹤器', url:'https://laicw.github.io/bank-tracker/' },
+      { id:'futures',   emoji:'📊', label:'微台指儀表板', url:'https://laicw.github.io/intraday-futures-monitor/' },
+      { id:'portfolio', emoji:'📈', label:'台股投組',   url:'https://laicw.github.io/twstock-portfolio/' },
+    ];
+
+    const nav = document.getElementById('nav');
+    const main = document.getElementById('main');
+    const loader = document.getElementById('loader');
+    const loaderLink = document.getElementById('loaderLink');
+    const loaded = {};
+
+    TOOLS.forEach(t => {
+      const btn = document.createElement('button');
+      btn.className = 'tab';
+      btn.id = 'tab-' + t.id;
+      btn.innerHTML = `<span class="emoji">${t.emoji}</span>${t.label}`;
+      btn.onclick = () => activate(t.id);
+      nav.appendChild(btn);
+    });
+
+    function activate(id){
+      const tool = TOOLS.find(t => t.id === id);
+      if(!tool) return;
+
+      // tabs
+      document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+      document.getElementById('tab-' + id).classList.add('active');
+
+      // lazy-create iframe once, keep it alive afterwards
+      let frame = document.getElementById('frame-' + id);
+      if(!frame){
+        frame = document.createElement('iframe');
+        frame.className = 'frame';
+        frame.id = 'frame-' + id;
+        frame.src = tool.url;
+        frame.addEventListener('load', () => { loaded[id] = true; hideLoaderIf(id); });
+        main.appendChild(frame);
+      }
+
+      // show only the active frame
+      document.querySelectorAll('.frame').forEach(f => f.classList.remove('active'));
+      frame.classList.add('active');
+
+      // loader handling
+      loaderLink.href = tool.url;
+      if(loaded[id]) loader.classList.remove('show');
+      else loader.classList.add('show');
+
+      try{ localStorage.setItem('lastTool', id); }catch(e){}
+      if(history.replaceState) history.replaceState(null,'','#'+id);
+    }
+
+    function hideLoaderIf(id){
+      const active = document.querySelector('.tab.active');
+      if(active && active.id === 'tab-' + id) loader.classList.remove('show');
+    }
+
+    // initial tab: URL hash > last used > first
+    const fromHash = location.hash.replace('#','');
+    let start = TOOLS.some(t=>t.id===fromHash) ? fromHash : null;
+    if(!start){ try{ start = localStorage.getItem('lastTool'); }catch(e){} }
+    if(!TOOLS.some(t=>t.id===start)) start = TOOLS[0].id;
+    activate(start);
+  </script>
+</body>
+</html>
