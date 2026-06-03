@@ -39,6 +39,16 @@
     main{flex:1 1 auto;position:relative;background:#fff;}
     .frame{position:absolute;inset:0;width:100%;height:100%;border:0;display:none;background:#fff;}
     .frame.active{display:block;}
+    .ext-panel{background:var(--bg);color:var(--txt);align-items:center;justify-content:center;text-align:center;}
+    .ext-panel.active{display:flex;}
+    .ext-inner{max-width:420px;padding:24px;}
+    .ext-emoji{font-size:48px;margin-bottom:6px;}
+    .ext-inner h2{margin:.2em 0;font-size:20px;}
+    .ext-inner p{color:var(--muted);font-size:14px;line-height:1.6;}
+    .ext-btn{display:inline-block;margin-top:14px;background:var(--accent);color:#fff;text-decoration:none;
+      padding:10px 20px;border-radius:999px;font-size:15px;}
+    .ext-btn:hover{filter:brightness(1.1);}
+    .ext-url{margin-top:12px;color:var(--muted);font-size:12px;word-break:break-all;}
 
     .loader{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
       background:var(--bg);color:var(--muted);font-size:14px;flex-direction:column;gap:12px;z-index:5;}
@@ -72,6 +82,9 @@
       { id:'bank',      emoji:'🏦', label:'銀行追蹤器', url:'https://laicw.github.io/bank-tracker/' },
       { id:'futures',   emoji:'📊', label:'微台指儀表板', url:'https://laicw.github.io/intraday-futures-monitor/' },
       { id:'portfolio', emoji:'📈', label:'台股投組',   url:'https://laicw.github.io/twstock-portfolio/' },
+      // Ghostfolio 需自架後端，且會擋 iframe → external:true（開新分頁）。
+      // 部署好後把下面的 url 換成你的 Synology 網址，例如 http://192.168.1.50:3333
+      { id:'ghostfolio', emoji:'🤍', label:'Ghostfolio', url:'http://CHANGE-ME-SYNOLOGY-IP:3333', external:true },
     ];
 
     const nav = document.getElementById('nav');
@@ -96,6 +109,31 @@
       // tabs
       document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
       document.getElementById('tab-' + id).classList.add('active');
+
+      // 外部工具（需自架後端、會擋 iframe）：顯示開新分頁面板，不建立 iframe
+      if(tool.external){
+        document.querySelectorAll('.frame').forEach(f => f.classList.remove('active'));
+        loader.classList.remove('show');
+        let panel = document.getElementById('ext-' + id);
+        if(!panel){
+          panel = document.createElement('div');
+          panel.className = 'frame ext-panel';
+          panel.id = 'ext-' + id;
+          panel.innerHTML =
+            '<div class="ext-inner">' +
+            '<div class="ext-emoji">' + tool.emoji + '</div>' +
+            '<h2>' + tool.label + '</h2>' +
+            '<p>此工具有自己的後端伺服器，無法內嵌於此頁，請在新分頁開啟。</p>' +
+            '<a class="ext-btn" href="' + tool.url + '" target="_blank" rel="noopener">開啟 ' + tool.label + ' ↗</a>' +
+            '<div class="ext-url">' + tool.url + '</div>' +
+            '</div>';
+          main.appendChild(panel);
+        }
+        panel.classList.add('active');
+        try{ localStorage.setItem('lastTool', id); }catch(e){}
+        if(history.replaceState) history.replaceState(null,'','#'+id);
+        return;
+      }
 
       // lazy-create iframe once, keep it alive afterwards
       let frame = document.getElementById('frame-' + id);
